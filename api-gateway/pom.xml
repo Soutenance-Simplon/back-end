@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.diamyaraam</groupId>
+        <artifactId>diam-yaraam</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>api-gateway</artifactId>
+    <name>DIAM-YARAAM :: API Gateway</name>
+
+    <!--
+        API GATEWAY — Point d'entrée unique (Port 8080)
+        ================================================
+        Le client (application mobile / web) n'appelle qu'UN SEUL service :
+        l'API Gateway sur le port 8080.
+
+        Le Gateway se charge de :
+          - Router chaque requête vers le bon microservice
+          - Vérifier le JWT (authentification centralisée)
+          - Gérer les CORS
+          - Limiter le débit (rate limiting)
+
+        Exemples de routage :
+          POST /api/auth/login     → auth-service:8081
+          GET  /api/medecins/...   → medecin-service:8083
+          POST /api/rdv/...        → rdv-service:8084
+    -->
+
+    <dependencies>
+        <!-- Spring Cloud Gateway (réactif, basé sur WebFlux) -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+        <!-- Eureka Client — le Gateway s'enregistre aussi et connaît les autres services -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <!-- JWT validation au niveau du Gateway -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

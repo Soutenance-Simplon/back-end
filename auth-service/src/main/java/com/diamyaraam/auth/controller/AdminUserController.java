@@ -2,11 +2,13 @@ package com.diamyaraam.auth.controller;
 
 import com.diamyaraam.auth.entity.Role;
 import com.diamyaraam.auth.entity.User;
+import com.diamyaraam.auth.repository.AuditLogRepository;
 import com.diamyaraam.auth.repository.RoleRepository;
 import com.diamyaraam.auth.repository.UserRepository;
 import com.diamyaraam.shared.dto.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -23,13 +25,16 @@ public class AdminUserController {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogRepository auditLogRepository;
 
     public AdminUserController(UserRepository userRepository,
                                RoleRepository roleRepository,
-                               PasswordEncoder passwordEncoder) {
+                               PasswordEncoder passwordEncoder,
+                               AuditLogRepository auditLogRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogRepository = auditLogRepository;
     }
 
     private Map<String, Object> toUserMap(User u) {
@@ -182,6 +187,120 @@ public class AdminUserController {
         return ResponseEntity.ok(ApiResponse.success("Compte débloqué et réactivé", toUserMap(saved)));
     }
 
+    @PutMapping("/users/{id}/password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> payload,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        String ancienMotDePasse = payload.get("ancienMotDePasse");
+        String nouveauMotDePasse = payload.get("nouveauMotDePasse");
+        String confirmationMotDePasse = payload.get("confirmationMotDePasse");
+
+        if (nouveauMotDePasse == null || nouveauMotDePasse.trim().length() < 6) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Le nouveau mot de passe doit comporter au moins 6 caractères."));
+        }
+
+        if (confirmationMotDePasse != null && !nouveauMotDePasse.equals(confirmationMotDePasse)) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("La confirmation du mot de passe ne correspond pas."));
+        }
+
+        Optional<User> opt = userRepository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(404).body(ApiResponse.error("Utilisateur introuvable."));
+        }
+
+        User user = opt.get();
+
+        // Si l'ancien mot de passe est fourni, on le vérifie
+        if (ancienMotDePasse != null && !ancienMotDePasse.isEmpty()) {
+            if (!passwordEncoder.matches(ancienMotDePasse, user.getPassword())) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("L'ancien mot de passe est incorrect."));
+            }
+        }
+
+        user.setPassword(passwordEncoder.encode(nouveauMotDePasse));
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
+        userRepository.save(user);
+
+        // Journaliser dans l'audit log
+        try {
+            com.diamyaraam.auth.entity.AuditLog log = new com.diamyaraam.auth.entity.AuditLog();
+            log.setActionType(com.diamyaraam.auth.entity.AuditLog.ActionType.CHANGEMENT_MOT_DE_PASSE);
+            log.setUser(user);
+            log.setTelephoneTente(user.getTelephone());
+            log.setIpAddress(httpRequest.getRemoteAddr());
+            log.setDetails("Changement de mot de passe par le profil administrateur");
+            log.setSuccess(true);
+            auditLogRepository.save(log);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(ApiResponse.success("Mot de passe mis à jour avec succès.", null));
+    }
+
+    @PutMapping("/users/{id}/profile")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateProfile(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> payload,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        Optional<User> opt = userRepository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(404).body(ApiResponse.error("Utilisateur introuvable."));
+        }
+
+        User user = opt.get();
+        String firstName = (String) payload.get("firstName");
+        String lastName = (String) payload.get("lastName");
+        String telephone = (String) payload.get("telephone");
+        String email = (String) payload.get("email");
+        String photoProfil = (String) payload.get("photoProfil");
+
+        if (firstName != null && !firstName.trim().isEmpty()) {
+            user.setFirstName(firstName.trim());
+        }
+        if (lastName != null && !lastName.trim().isEmpty()) {
+            user.setLastName(lastName.trim());
+        }
+
+        if (telephone != null && !telephone.trim().isEmpty() && !telephone.equals(user.getTelephone())) {
+            if (userRepository.existsByTelephone(telephone.trim())) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("Ce numéro de téléphone est déjà utilisé par un autre compte."));
+            }
+            user.setTelephone(telephone.trim());
+        }
+
+        if (email != null && !email.trim().isEmpty() && !email.equalsIgnoreCase(user.getEmail())) {
+            if (userRepository.existsByEmail(email.trim())) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("Cette adresse email est déjà associée à un compte."));
+            }
+            user.setEmail(email.trim());
+        } else if (email != null && email.trim().isEmpty()) {
+            user.setEmail(null);
+        }
+
+        if (photoProfil != null) {
+            user.setPhotoProfil(photoProfil);
+        }
+
+        User saved = userRepository.save(user);
+
+        // Journaliser dans l'audit log
+        try {
+            com.diamyaraam.auth.entity.AuditLog log = new com.diamyaraam.auth.entity.AuditLog();
+            log.setActionType(com.diamyaraam.auth.entity.AuditLog.ActionType.MODIFICATION_PROFIL);
+            log.setUser(saved);
+            log.setTelephoneTente(saved.getTelephone());
+            log.setIpAddress(httpRequest.getRemoteAddr());
+            log.setDetails("Mise à jour des coordonnées par le profil administrateur");
+            log.setSuccess(true);
+            auditLogRepository.save(log);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(ApiResponse.success("Profil mis à jour avec succès.", toUserMap(saved)));
+    }
+
     @PostMapping("/users")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createUser(@RequestBody Map<String, Object> payload) {
         try {
@@ -231,13 +350,24 @@ public class AdminUserController {
     }
 
     @DeleteMapping("/users/{id}")
+    @Transactional
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable UUID id) {
         Optional<User> opt = userRepository.findById(id);
         if (opt.isEmpty()) {
             return ResponseEntity.status(404).body(ApiResponse.error("Utilisateur introuvable"));
         }
 
-        userRepository.deleteById(id);
+        User u = opt.get();
+        // Détacher l'utilisateur des journaux d'audit pour préserver la traçabilité médicale sans bloquer la suppression
+        auditLogRepository.findByUserOrderByCreatedAtDesc(u).forEach(a -> {
+            a.setUser(null);
+            if (a.getTelephoneTente() == null) {
+                a.setTelephoneTente(u.getTelephone());
+            }
+            auditLogRepository.save(a);
+        });
+
+        userRepository.delete(u);
         return ResponseEntity.ok(ApiResponse.success("Utilisateur supprimé avec succès", null));
     }
 

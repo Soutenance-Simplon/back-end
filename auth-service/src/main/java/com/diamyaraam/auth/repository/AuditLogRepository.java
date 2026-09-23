@@ -16,4 +16,8 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
     List<AuditLog> findByUserAndActionType(User user, ActionType type);
     long countByUserAndActionTypeAndCreatedAtAfter(User user, ActionType type, LocalDateTime since);
     List<AuditLog> findByTelephoneTente(String telephone);
+
+    @org.springframework.data.jpa.repository.Query("SELECT a FROM AuditLog a LEFT JOIN FETCH a.user u LEFT JOIN FETCH u.role ORDER BY a.createdAt DESC")
+    List<AuditLog> findTop100AuditLogs();
 }
+

@@ -33,7 +33,10 @@ public class AuditLog {
         OTP_EXPIRE,
         OTP_ECHEC,
         OTP_MAX_ATTEINT,
-        MODIFICATION_PROFIL
+        MODIFICATION_PROFIL,
+        ACCES_DOSSIER_MEDECIN,
+        ACCES_DOSSIER_URGENCE_BRIS_DE_GLACE,
+        SIGNALEMENT_ACCES_ABUSIF
     }
 
     @Enumerated(EnumType.STRING)

@@ -184,5 +184,15 @@ public class WalletController {
             return ResponseEntity.badRequest().body(ApiResponse.error("Erreur ajustement : " + e.getMessage()));
         }
     }
+
+    @DeleteMapping("/beneficiaire/{beneficiaireId}")
+    public ResponseEntity<ApiResponse<Void>> supprimerBeneficiaire(@PathVariable UUID beneficiaireId) {
+        try {
+            walletService.supprimerBeneficiaire(beneficiaireId);
+            return ResponseEntity.ok(ApiResponse.success("Bénéficiaire supprimé avec succès", null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Erreur suppression bénéficiaire : " + e.getMessage()));
+        }
+    }
 }
 

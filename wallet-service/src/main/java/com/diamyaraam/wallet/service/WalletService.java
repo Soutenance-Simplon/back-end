@@ -343,13 +343,18 @@ public class WalletService {
 
     // RM145 — Traçabilité et audit financier
     private void audit(UUID userId, UUID transactionId, AuditFinancier.ActionFinanciere action, BigDecimal montant, boolean success, String details) {
-        AuditFinancier item = new AuditFinancier();
-        item.setUserId(userId);
-        item.setTransactionId(transactionId);
-        item.setAction(action);
-        item.setMontant(montant);
-        item.setSuccess(success);
-        audit(userId, transactionId, action, montant, success, details);
+        try {
+            AuditFinancier item = new AuditFinancier();
+            item.setUserId(userId);
+            item.setTransactionId(transactionId);
+            item.setAction(action);
+            item.setMontant(montant);
+            item.setSuccess(success);
+            item.setDetails(details);
+            auditRepository.save(item);
+        } catch (Exception ignored) {
+            // Ne pas bloquer le service si l'audit échoue
+        }
     }
 
     public List<Portefeuille> getAllPortefeuilles() {
@@ -390,6 +395,13 @@ public class WalletService {
         audit(userId, saved.getId(), isCredit ? AuditFinancier.ActionFinanciere.DEPOT : AuditFinancier.ActionFinanciere.PAIEMENT,
                 montant, true, "Ajustement administratif : " + justification);
         return saved;
+    }
+
+    @Transactional
+    public void supprimerBeneficiaire(UUID beneficiaireId) {
+        Beneficiaire b = beneficiaireRepository.findById(beneficiaireId)
+                .orElseThrow(() -> new IllegalArgumentException("Bénéficiaire introuvable : " + beneficiaireId));
+        beneficiaireRepository.delete(b);
     }
 }
 

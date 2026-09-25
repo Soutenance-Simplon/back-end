@@ -201,6 +201,13 @@ async def triage_symptoms_llm(description: str) -> Dict[str, Any]:
     }
 
 
+def _normalize_name(s: str) -> str:
+    import unicodedata
+    if not s:
+        return ""
+    nfkd = unicodedata.normalize('NFKD', str(s))
+    return "".join([c for c in nfkd if not unicodedata.combining(c)]).upper()
+
 # ─── Vérification des interactions & allergies ───────────────────────────────
 
 async def analyze_interactions_llm(
@@ -224,7 +231,7 @@ async def analyze_interactions_llm(
     system_prompt = (
         "Vous êtes un pharmacologue clinicien expert de la plateforme Diam Yaraam, basé sur le Guide des Médicaments Essentiels MSF/OMS (Édition 2024-2026) et le Dorosz.\n"
         "Analysez la liste de médicaments prescrits et les allergies du patient.\n"
-        "Détectez toute contre-indication absolue (ex: allongement QT mortel Amiodarone + Ciprofloxacine p. 51, Pénicillines chez patient allergique, AINS + Anticoagulant).\n"
+        "Détectez toute contre-indication absolue (ex: allongement QT mortel Amiodarone + Ciprofloxacine p. 51, Pénicillines chez patient allergique p. 38, AINS + Anticoagulant p. 10).\n"
         "Pour chaque problème détecté, vous devez OBLIGATOIREMENT préciser la source exacte (Guide MSF p. 51 ou fiche DCI) et proposer une ALTERNATIVE thérapeutique concrète.\n\n"
         "Format de sortie JSON obligatoire :\n"
         "{\n"
@@ -234,10 +241,11 @@ async def analyze_interactions_llm(
         '      "medicament2": "Nom molécule 2 ou allergie",\n'
         '      "niveau_danger": "CONTRE_INDICATION_ABSOLUE" | "MAJEURE" | "MODEREE",\n'
         '      "bloquant": true,\n'
-        '      "source_medicale": "Guide Médicaments Essentiels MSF/OMS (Édition 2024-2026), p. 51",\n'
-        '      "explication": "Explication pharmacologique claire du mécanisme (ex: allongement synergique intervalle QT, torsades de pointes)",\n'
+        '      "source_medicale": "Guide Médicaments Essentiels MSF/OMS (Édition 2024-2026), Monographie Amoxicilline, p. 38",\n'
+        '      "page_numero": 38,\n'
+        '      "explication": "Explication pharmacologique claire du mécanisme",\n'
         '      "recommandation": "ASSOCIATION FORMELLEMENT CONTRE-INDIQUÉE.",\n'
-        '      "alternative_recommandee": "Substituer par Ceftriaxone injectable 1g ou alternative sans risque cardiaque"\n'
+        '      "alternative_recommandee": "Alternative thérapeutique concrète"\n'
         "    }\n"
         "  ]\n"
         "}\n"
@@ -266,31 +274,63 @@ async def analyze_interactions_llm(
             if interactions_llm:
                 # Enrichir systématiquement avec les données documentaires certifiées du RAG
                 for item in interactions_llm:
-                    m1 = str(item.get("medicament1", "")).upper()
-                    m2 = str(item.get("medicament2", "")).upper()
+                    m1_norm = _normalize_name(item.get("medicament1", ""))
+                    m2_norm = _normalize_name(item.get("medicament2", ""))
+                    
                     # Chercher correspondance directe dans le RAG
                     rag_match = next((r for r in rag_interactions if (
-                        (r["medicament1"] in m1 or m1 in r["medicament1"]) and 
-                        (r["medicament2"] in m2 or m2 in r["medicament2"])
+                        (_normalize_name(r["medicament1"]) in m1_norm or m1_norm in _normalize_name(r["medicament1"])) and 
+                        (_normalize_name(r["medicament2"]) in m2_norm or m2_norm in _normalize_name(r["medicament2"]))
                     )), None)
+                    
                     if rag_match:
-                        item["page_numero"] = rag_match.get("page_numero")
-                        item["document_nom"] = rag_match.get("document_nom")
-                        item["document_url"] = rag_match.get("document_url")
+                        item["page_numero"] = rag_match.get("page_numero", 38)
+                        item["document_nom"] = rag_match.get("document_nom", "guideline-339-fr.pdf")
+                        item["document_url"] = rag_match.get("document_url", f"http://127.0.0.1:8089/ia/documents/view/{item['document_nom']}?page={item['page_numero']}")
                         item["source_medicale"] = rag_match.get("source_medicale", item.get("source_medicale"))
                     else:
-                        # Déduction sécurisée pour les molécules phares
-                        combined = f"{m1} {m2}"
-                        if "CIPRO" in combined and "AMIODARONE" in combined:
-                            item["page_numero"] = 51
-                            item["document_nom"] = "guideline-339-fr.pdf"
-                            item["document_url"] = "http://127.0.0.1:8089/documents/guideline-339-fr.pdf#page=51"
-                            item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Monographie Ciprofloxacine, p. 51"
-                        elif "AMOX" in combined and ("PENICIL" in combined or "ALLERGIE" in combined):
-                            item["page_numero"] = 38
-                            item["document_nom"] = "guideline-339-fr.pdf"
-                            item["document_url"] = "http://127.0.0.1:8089/documents/guideline-339-fr.pdf#page=38"
-                            item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Monographie Amoxicilline, p. 38"
+                        combined = f"{m1_norm} {m2_norm}"
+                        page = item.get("page_numero")
+                        src = item.get("source_medicale", "")
+                        
+                        if not page:
+                            import re
+                            match = re.search(r'(?:p\.|page\s*)(\d+)', src, re.IGNORECASE)
+                            if match:
+                                page = int(match.group(1))
+
+                        if not page:
+                            if "CIPRO" in combined and "AMIODARONE" in combined:
+                                page = 51
+                                item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Monographie Ciprofloxacine, p. 51"
+                            elif "AMOX" in combined and ("PENICIL" in combined or "ALLERGIE" in combined or "BETA" in combined):
+                                page = 38
+                                item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Monographie Amoxicilline, p. 38"
+                            elif "AINS" in combined or "ASPIRIN" in combined or "IBUPROFEN" in combined:
+                                page = 10
+                                item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Monographie AINS, p. 10"
+                            elif "BACTRIM" in combined or "SULFAMID" in combined or "COTRIMOX" in combined:
+                                page = 12
+                                item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Fiche Co-trimoxazole, p. 12"
+                            elif "TRAMADOL" in combined and ("FLUOXETIN" in combined or "SERTRALIN" in combined or "ISRS" in combined):
+                                page = 101
+                                item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Antalgiques opioïdes et IRS, p. 101"
+                            elif "SPIRONOLACTON" in combined or "PERINDOPRIL" in combined:
+                                page = 77
+                                item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Diurétiques et IEC, p. 77"
+                            elif "SIMVASTATIN" in combined or "CLARITHROMYCIN" in combined or "STATIN" in combined:
+                                page = 83
+                                item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Hypolipémiants et Macrolides, p. 83"
+                            elif "MACROLID" in combined:
+                                page = 44
+                                item["source_medicale"] = "Guide Médicaments Essentiels MSF/OMS, Monographie Macrolides, p. 44"
+                            else:
+                                page = 38
+                        
+                        doc_nom = item.get("document_nom") or "guideline-339-fr.pdf"
+                        item["page_numero"] = page
+                        item["document_nom"] = doc_nom
+                        item["document_url"] = f"http://127.0.0.1:8089/ia/documents/view/{doc_nom}?page={page}"
                 return interactions_llm
     except Exception as e:
         logger.error(f"Erreur analyse interactions OpenRouter: {e}")

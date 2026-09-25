@@ -19,13 +19,13 @@ import java.util.Map;
 @Service
 public class LiveKitTokenService {
 
-    @Value("${livekit.url:wss://diam-yaraam.livekit.cloud}")
+    @Value("${livekit.url:wss://diamyaram-3e670ked.livekit.cloud}")
     private String livekitUrl;
 
-    @Value("${livekit.api-key:devkey}")
+    @Value("${livekit.api-key:APIHHuyhcofZoip}")
     private String apiKey;
 
-    @Value("${livekit.api-secret:secret2026diamyaraamcloudteleconsultation}")
+    @Value("${livekit.api-secret:JDgn9j9M35DVRcnmAntd4An2vVfZ4e18QYYy8Ho4NOQ}")
     private String apiSecret;
 
     public String getLivekitUrl() {

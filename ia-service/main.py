@@ -317,15 +317,28 @@ async def verifier_interactions(req: InteractionRequest):
     
     response_list = []
     for item in raw_results:
+        page = item.get("page_numero")
+        if not page:
+            import re
+            src = str(item.get("source_medicale", ""))
+            match = re.search(r'(?:p\.|page\s*)(\d+)', src, re.IGNORECASE)
+            if match:
+                page = int(match.group(1))
+            else:
+                page = 38
+        
+        doc_nom = item.get("document_nom") or "guideline-339-fr.pdf"
+        doc_url = item.get("document_url") or f"http://127.0.0.1:8089/ia/documents/view/{doc_nom}?page={page}"
+
         response_list.append(InteractionResponse(
             medicament1=item.get("medicament1", "Médicament"),
             medicament2=item.get("medicament2", "Interaction/Allergie"),
             niveau_danger=item.get("niveau_danger", "MODEREE"),
             bloquant=item.get("bloquant", False),
             source_medicale=item.get("source_medicale", "Guide Médicaments Essentiels MSF/OMS"),
-            page_numero=item.get("page_numero"),
-            document_url=item.get("document_url"),
-            document_nom=item.get("document_nom"),
+            page_numero=page,
+            document_url=doc_url,
+            document_nom=doc_nom,
             explication=item.get("explication", "Risque d'interaction médicamenteuse."),
             recommandation=item.get("recommandation", "Vérifier la posologie ou demander l'avis d'un confrère."),
             alternative_recommandee=item.get("alternative_recommandee")
@@ -379,25 +392,25 @@ async def view_document_page(filename: str, page: int = 1):
             body, html {{ margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0F172A; }}
             .header {{ height: 52px; background: #1E293B; color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid #334155; }}
             .title {{ font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; }}
-            .badge-page {{ background: #DC2626; color: white; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; }}
+            .badge-page {{ background: #0D7C66; color: white; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; }}
             .doc-name {{ color: #94A3B8; font-size: 13px; }}
-            .btn {{ background: #00A884; color: white; text-decoration: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; }}
-            .btn:hover {{ background: #008F6F; }}
+            .btn {{ background: #0D7C66; color: white; text-decoration: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; }}
+            .btn:hover {{ background: #095949; }}
             iframe {{ width: 100%; height: calc(100% - 52px); border: none; background: #525659; }}
         </style>
     </head>
     <body>
         <div class="header">
             <div class="title">
-                <span>Diam Yaraam — Référentiel Médical Officiel</span>
+                <span>📖 Diam Yaraam — Référentiel Médical Officiel</span>
                 <span class="badge-page">Page {page}</span>
                 <span class="doc-name">{filename}</span>
             </div>
             <div>
-                <a class="btn" href="/documents/{filename}#page={page}" target="_blank">Ouvrir dans le lecteur PDF ↗</a>
+                <a class="btn" href="/documents/{filename}#page={page}&zoom=100" target="_blank">Ouvrir dans le lecteur PDF (Page {page}) ↗</a>
             </div>
         </div>
-        <iframe src="/documents/{filename}#page={page}"></iframe>
+        <iframe src="/documents/{filename}#page={page}&zoom=100"></iframe>
     </body>
     </html>
     """

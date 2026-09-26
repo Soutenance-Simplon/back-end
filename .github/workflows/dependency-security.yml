@@ -1,0 +1,99 @@
+# ============================================================
+# DIAM-YARAAM — Dependency Review
+# ============================================================
+#
+# Ce workflow vérifie les changements de dépendances lors
+# des Pull Requests.
+#
+# Objectif :
+# détecter l'introduction de dépendances présentant des
+# vulnérabilités connues avant leur fusion.
+#
+# Ce workflow complète CodeQL :
+#
+# CodeQL
+#   → analyse le code source
+#
+# Dependency Review
+#   → analyse les changements de dépendances
+#
+# ============================================================
+
+name: DIAM-YARAAM Dependency Review
+
+# ============================================================
+# DÉCLENCHEUR
+# ============================================================
+
+on:
+
+  # Dependency Review est particulièrement adapté aux
+  # Pull Requests car il compare les dépendances entre
+  # la branche de destination et la branche de travail.
+  pull_request:
+    branches:
+      - develop
+      - main
+      - 'release/**'
+
+# ============================================================
+# PERMISSIONS
+# ============================================================
+
+permissions:
+
+  # Autorise GitHub Actions à lire le repository.
+  contents: read
+
+# ============================================================
+# JOB
+# ============================================================
+
+jobs:
+
+  dependency-review:
+
+    # Nom affiché dans GitHub Actions.
+    name: Vérification des dépendances
+
+    # Machine virtuelle utilisée par GitHub.
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # --------------------------------------------------------
+      # 1. RÉCUPÉRER LE CODE
+      # --------------------------------------------------------
+
+      - name: Récupérer le repository
+        uses: actions/checkout@v7
+
+      # --------------------------------------------------------
+      # 2. ANALYSER LES DÉPENDANCES
+      # --------------------------------------------------------
+      #
+      # L'action compare les dépendances modifiées dans
+      # la Pull Request et recherche des vulnérabilités
+      # connues.
+      #
+      # fail-on-severity:
+      #
+      #   moderate
+      #
+      # signifie que le workflow échouera si une dépendance
+      # introduite dans la Pull Request présente une
+      # vulnérabilité de niveau moderate ou supérieur.
+      #
+      # Les niveaux possibles sont :
+      #
+      #   low
+      #   moderate
+      #   high
+      #   critical
+      #
+      # --------------------------------------------------------
+
+      - name: Analyser les dépendances
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate

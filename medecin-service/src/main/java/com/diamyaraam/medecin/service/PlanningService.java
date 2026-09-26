@@ -57,6 +57,9 @@ public class PlanningService {
         if (start == null || end == null) {
             throw new IllegalArgumentException("Les dates de début et de fin du créneau sont obligatoires.");
         }
+        if (start.isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Impossible de créer un créneau pour une date ou une heure passée.");
+        }
         if (!end.isAfter(start)) {
             throw new IllegalArgumentException("L'heure de fin doit être strictement postérieure à l'heure de début.");
         }
@@ -84,7 +87,10 @@ public class PlanningService {
 
     public List<CreneauDisponible> getCreneauxDisponibles(UUID medecinId) {
         Medecin m = resolveMedecin(medecinId);
-        return creneauRepository.findByMedecinIdAndStatutOrderByDateHeureDebutAsc(m.getId(), CreneauDisponible.StatutCreneau.DISPONIBLE);
+        return creneauRepository.findByMedecinIdAndStatutOrderByDateHeureDebutAsc(m.getId(), CreneauDisponible.StatutCreneau.DISPONIBLE)
+                .stream()
+                .filter(c -> c.getDateHeureDebut().isAfter(LocalDateTime.now()))
+                .toList();
     }
 
     public List<CreneauDisponible> getTousLesCreneaux(UUID medecinId) {

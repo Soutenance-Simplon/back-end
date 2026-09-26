@@ -68,8 +68,8 @@ public class RendezVousService {
 
     @Transactional
     public RendezVous demanderRendezVous(UUID patientId, UUID medecinId, String motif, LocalDateTime dateHeure) {
-        if (dateHeure != null && dateHeure.isBefore(LocalDateTime.now().minusMinutes(2))) {
-            throw new IllegalArgumentException("Impossible de réserver un rendez-vous pour une date ou une heure passée.");
+        if (dateHeure != null && dateHeure.isBefore(LocalDateTime.now().plusMinutes(30))) {
+            throw new IllegalArgumentException("Un rendez-vous doit être pris au moins 30 minutes à l'avance.");
         }
         RendezVous rdv = new RendezVous();
         rdv.setPatientId(patientId);

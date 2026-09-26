@@ -68,7 +68,30 @@ public class DossierMedicalService {
     public Allergie addAllergie(UUID patientId, Allergie allergie) {
         DossierMedical dossier = getOrCreateDossier(patientId);
         allergie.setDossierMedical(dossier);
-        return allergieRepository.save(allergie);
+        Allergie saved = allergieRepository.save(allergie);
+
+        if (realtimePublisher != null) {
+            try {
+                realtimePublisher.publish("/topic/dossier", "ALLERGIE_AJOUTEE", Map.of(
+                    "type", "ALLERGIE",
+                    "patientId", patientId.toString(),
+                    "allergie", saved.getNom() != null ? saved.getNom() : "",
+                    "date", LocalDateTime.now().toString()
+                ));
+                realtimePublisher.publish("/topic/notifications", "NEW_NOTIFICATION", Map.of(
+                    "id", "notif-" + UUID.randomUUID().toString().substring(0, 8),
+                    "userId", patientId.toString(),
+                    "type", "DOSSIER_MIS_A_JOUR",
+                    "titre", "Mise à jour de votre dossier médical",
+                    "corps", "Le médecin a enregistré une allergie dans votre dossier médical.",
+                    "message", "Le médecin a enregistré une allergie dans votre dossier médical.",
+                    "dateEnvoi", LocalDateTime.now().toString(),
+                    "lue", false
+                ));
+            } catch (Exception ignored) {}
+        }
+
+        return saved;
     }
 
     public List<Allergie> getAllergies(UUID patientId) {
@@ -80,7 +103,30 @@ public class DossierMedicalService {
     public AntecedentMedical addAntecedent(UUID patientId, AntecedentMedical antecedent) {
         DossierMedical dossier = getOrCreateDossier(patientId);
         antecedent.setDossierMedical(dossier);
-        return antecedentRepository.save(antecedent);
+        AntecedentMedical saved = antecedentRepository.save(antecedent);
+
+        if (realtimePublisher != null) {
+            try {
+                realtimePublisher.publish("/topic/dossier", "ANTECEDENT_AJOUTE", Map.of(
+                    "type", "ANTECEDENT",
+                    "patientId", patientId.toString(),
+                    "description", saved.getDescription() != null ? saved.getDescription() : "",
+                    "date", LocalDateTime.now().toString()
+                ));
+                realtimePublisher.publish("/topic/notifications", "NEW_NOTIFICATION", Map.of(
+                    "id", "notif-" + UUID.randomUUID().toString().substring(0, 8),
+                    "userId", patientId.toString(),
+                    "type", "DOSSIER_MIS_A_JOUR",
+                    "titre", "Mise à jour de votre dossier médical",
+                    "corps", "Le médecin a ajouté un antécédent médical à votre dossier.",
+                    "message", "Le médecin a ajouté un antécédent médical à votre dossier.",
+                    "dateEnvoi", LocalDateTime.now().toString(),
+                    "lue", false
+                ));
+            } catch (Exception ignored) {}
+        }
+
+        return saved;
     }
 
     public List<AntecedentMedical> getAntecedents(UUID patientId) {
@@ -92,7 +138,30 @@ public class DossierMedicalService {
     public MaladieCronique addMaladie(UUID patientId, MaladieCronique maladie) {
         DossierMedical dossier = getOrCreateDossier(patientId);
         maladie.setDossierMedical(dossier);
-        return maladieRepository.save(maladie);
+        MaladieCronique saved = maladieRepository.save(maladie);
+
+        if (realtimePublisher != null) {
+            try {
+                realtimePublisher.publish("/topic/dossier", "MALADIE_AJOUTEE", Map.of(
+                    "type", "MALADIE_CHRONIQUE",
+                    "patientId", patientId.toString(),
+                    "nom", saved.getNomMaladie() != null ? saved.getNomMaladie() : "",
+                    "date", LocalDateTime.now().toString()
+                ));
+                realtimePublisher.publish("/topic/notifications", "NEW_NOTIFICATION", Map.of(
+                    "id", "notif-" + UUID.randomUUID().toString().substring(0, 8),
+                    "userId", patientId.toString(),
+                    "type", "DOSSIER_MIS_A_JOUR",
+                    "titre", "Mise à jour de votre dossier médical",
+                    "corps", "Le médecin a enregistré une maladie chronique dans votre dossier.",
+                    "message", "Le médecin a enregistré une maladie chronique dans votre dossier.",
+                    "dateEnvoi", LocalDateTime.now().toString(),
+                    "lue", false
+                ));
+            } catch (Exception ignored) {}
+        }
+
+        return saved;
     }
 
     public List<MaladieCronique> getMaladies(UUID patientId) {
@@ -178,7 +247,29 @@ public class DossierMedicalService {
     public Hospitalisation addHospitalisation(UUID patientId, Hospitalisation hospitalisation) {
         DossierMedical dossier = getOrCreateDossier(patientId);
         hospitalisation.setDossierMedical(dossier);
-        return hospitalisationRepository.save(hospitalisation);
+        Hospitalisation saved = hospitalisationRepository.save(hospitalisation);
+
+        if (realtimePublisher != null) {
+            try {
+                realtimePublisher.publish("/topic/dossier", "HOSPITALISATION_AJOUTEE", Map.of(
+                    "type", "HOSPITALISATION",
+                    "patientId", patientId.toString(),
+                    "date", LocalDateTime.now().toString()
+                ));
+                realtimePublisher.publish("/topic/notifications", "NEW_NOTIFICATION", Map.of(
+                    "id", "notif-" + UUID.randomUUID().toString().substring(0, 8),
+                    "userId", patientId.toString(),
+                    "type", "DOSSIER_MIS_A_JOUR",
+                    "titre", "Mise à jour de votre dossier médical",
+                    "corps", "Le médecin a enregistré une hospitalisation dans votre dossier médical.",
+                    "message", "Le médecin a enregistré une hospitalisation dans votre dossier médical.",
+                    "dateEnvoi", LocalDateTime.now().toString(),
+                    "lue", false
+                ));
+            } catch (Exception ignored) {}
+        }
+
+        return saved;
     }
 
     public List<Hospitalisation> getHospitalisations(UUID patientId) {
@@ -191,7 +282,30 @@ public class DossierMedicalService {
     public Vaccination addVaccination(UUID patientId, Vaccination vaccination) {
         DossierMedical dossier = getOrCreateDossier(patientId);
         vaccination.setDossierMedical(dossier);
-        return vaccinationRepository.save(vaccination);
+        Vaccination saved = vaccinationRepository.save(vaccination);
+
+        if (realtimePublisher != null) {
+            try {
+                realtimePublisher.publish("/topic/dossier", "VACCINATION_AJOUTEE", Map.of(
+                    "type", "VACCINATION",
+                    "patientId", patientId.toString(),
+                    "vaccin", saved.getNomVaccin() != null ? saved.getNomVaccin() : "",
+                    "date", LocalDateTime.now().toString()
+                ));
+                realtimePublisher.publish("/topic/notifications", "NEW_NOTIFICATION", Map.of(
+                    "id", "notif-" + UUID.randomUUID().toString().substring(0, 8),
+                    "userId", patientId.toString(),
+                    "type", "DOSSIER_MIS_A_JOUR",
+                    "titre", "Mise à jour de votre dossier médical",
+                    "corps", "Le médecin a enregistré une vaccination dans votre dossier médical.",
+                    "message", "Le médecin a enregistré une vaccination dans votre dossier médical.",
+                    "dateEnvoi", LocalDateTime.now().toString(),
+                    "lue", false
+                ));
+            } catch (Exception ignored) {}
+        }
+
+        return saved;
     }
 
     public List<Vaccination> getVaccinations(UUID patientId) {
@@ -204,7 +318,30 @@ public class DossierMedicalService {
     public DocumentMedical addDocument(UUID patientId, DocumentMedical document) {
         DossierMedical dossier = getOrCreateDossier(patientId);
         document.setDossierMedical(dossier);
-        return documentMedicalRepository.save(document);
+        DocumentMedical saved = documentMedicalRepository.save(document);
+
+        if (realtimePublisher != null) {
+            try {
+                realtimePublisher.publish("/topic/dossier", "DOCUMENT_AJOUTE", Map.of(
+                    "type", "DOCUMENT",
+                    "patientId", patientId.toString(),
+                    "nomFichier", saved.getTitre() != null ? saved.getTitre() : "Document",
+                    "date", LocalDateTime.now().toString()
+                ));
+                realtimePublisher.publish("/topic/notifications", "NEW_NOTIFICATION", Map.of(
+                    "id", "notif-" + UUID.randomUUID().toString().substring(0, 8),
+                    "userId", patientId.toString(),
+                    "type", "DOSSIER_MIS_A_JOUR",
+                    "titre", "Nouveau document médical",
+                    "corps", "Le médecin a ajouté un document à votre dossier médical.",
+                    "message", "Le médecin a ajouté un document à votre dossier médical.",
+                    "dateEnvoi", LocalDateTime.now().toString(),
+                    "lue", false
+                ));
+            } catch (Exception ignored) {}
+        }
+
+        return saved;
     }
 
     public List<DocumentMedical> getDocuments(UUID patientId) {

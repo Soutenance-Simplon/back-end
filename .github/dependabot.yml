@@ -1,0 +1,79 @@
+# ============================================================
+# DIAM-YARAAM — Dependabot
+# ============================================================
+#
+# Dependabot surveille les dépendances du projet et peut
+# proposer automatiquement des Pull Requests lorsqu'une
+# mise à jour est disponible.
+#
+# Écosystèmes surveillés :
+#
+#   1. Maven
+#      → backend Spring Boot
+#
+#   2. Python
+#      → ia-service
+#
+#   3. GitHub Actions
+#      → actions utilisées dans les workflows CI/CD
+#
+# ============================================================
+
+version: 2
+
+updates:
+
+  # ==========================================================
+  # 1. DÉPENDANCES MAVEN
+  # ==========================================================
+  #
+  # Le projet possède un pom.xml parent à la racine qui
+  # référence les différents modules Maven.
+  #
+  # Dependabot surveillera donc les dépendances Maven
+  # du projet.
+  #
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+    # Nombre maximum de Pull Requests Dependabot
+    # ouvertes simultanément.
+    open-pull-requests-limit: 10
+
+  # ==========================================================
+  # 2. DÉPENDANCES PYTHON
+  # ==========================================================
+  #
+  # ia-service possède son propre requirements.txt.
+  #
+  - package-ecosystem: "pip"
+    directory: "/ia-service"
+    schedule:
+      interval: "weekly"
+
+    open-pull-requests-limit: 10
+
+  # ==========================================================
+  # 3. GITHUB ACTIONS
+  # ==========================================================
+  #
+  # Dependabot surveille également les versions des actions
+  # utilisées dans :
+  #
+  #   .github/workflows/
+  #
+  # Par exemple :
+  #
+  #   actions/checkout
+  #   actions/setup-java
+  #   github/codeql-action
+  #   actions/dependency-review-action
+  #
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+    open-pull-requests-limit: 10

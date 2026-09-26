@@ -1,0 +1,298 @@
+# ============================================================
+# DIAM-YARAAM — Analyse de sécurité avec CodeQL
+# ============================================================
+#
+# CodeQL permet de réaliser une analyse statique de sécurité
+# (SAST) du code source.
+#
+# Langages analysés :
+#   - Java  → backend Spring Boot
+#   - Python → ia-service
+#
+# Ce workflow est indépendant du CI classique.
+#
+# backend-ci.yml
+#     → compilation + tests
+#
+# codeql.yml
+#     → analyse de sécurité du code
+# ============================================================
+
+name: DIAM-YARAAM CodeQL Security
+
+
+# ============================================================
+# DÉCLENCHEURS DU WORKFLOW
+# ============================================================
+
+on:
+
+  # ----------------------------------------------------------
+  # Déclencher CodeQL lorsqu'un commit est poussé sur
+  # certaines branches.
+  # ----------------------------------------------------------
+  push:
+    branches:
+      - develop
+      - main
+      - 'feature/**'
+      - 'release/**'
+
+
+  # ----------------------------------------------------------
+  # Déclencher CodeQL lors des Pull Requests vers :
+  #   - develop
+  #   - main
+  #   - release/*
+  #
+  # Cela permet de vérifier la sécurité avant une fusion.
+  # ----------------------------------------------------------
+  pull_request:
+    branches:
+      - develop
+      - main
+      - 'release/**'
+
+
+  # ----------------------------------------------------------
+  # Analyse de sécurité programmée.
+  #
+  # Ici :
+  #   chaque lundi à 02h30 UTC.
+  #
+  # Pourquoi ?
+  # Parce qu'une analyse de sécurité peut être utile même
+  # lorsqu'aucun nouveau commit n'a été effectué.
+  # ----------------------------------------------------------
+  schedule:
+    - cron: '30 2 * * 1'
+
+
+  # ----------------------------------------------------------
+  # Permet de lancer manuellement le workflow depuis GitHub.
+  # ----------------------------------------------------------
+  workflow_dispatch:
+
+
+# ============================================================
+# PERMISSIONS
+# ============================================================
+
+permissions:
+
+  # Autorise le workflow à lire le contenu du repository.
+  contents: read
+
+  # Autorise CodeQL à publier les résultats de sécurité
+  # dans GitHub Code Scanning.
+  security-events: write
+
+
+# ============================================================
+# JOB CODEQL
+# ============================================================
+
+jobs:
+
+  codeql:
+
+    # Nom affiché dans GitHub Actions.
+    name: Analyse CodeQL
+
+    # Machine virtuelle GitHub utilisée pour l'analyse.
+    runs-on: ubuntu-latest
+
+
+    # ========================================================
+    # MATRICE
+    # ========================================================
+    #
+    # Nous devons analyser deux langages :
+    #
+    #   1. Java
+    #   2. Python
+    #
+    # GitHub va donc exécuter ce job deux fois.
+    #
+    # ========================================================
+
+    strategy:
+
+      # Si Java échoue, Python continue quand même son analyse.
+      fail-fast: false
+
+      matrix:
+
+        include:
+
+          # --------------------------------------------------
+          # ANALYSE JAVA
+          # --------------------------------------------------
+          #
+          # Java est un langage compilé.
+          # Nous devons donc construire le projet avant
+          # l'analyse CodeQL.
+          # --------------------------------------------------
+
+          - language: java
+            build-mode: manual
+
+
+          # --------------------------------------------------
+          # ANALYSE PYTHON
+          # --------------------------------------------------
+          #
+          # Python est un langage interprété.
+          # Aucune compilation Maven n'est nécessaire.
+          # --------------------------------------------------
+
+          - language: python
+            build-mode: none
+
+
+    # ========================================================
+    # ÉTAPES DU JOB
+    # ========================================================
+
+    steps:
+
+      # ------------------------------------------------------
+      # 1. RÉCUPÉRER LE CODE
+      # ------------------------------------------------------
+      #
+      # GitHub Actions récupère le contenu du repository
+      # afin que CodeQL puisse analyser les fichiers.
+      # ------------------------------------------------------
+
+      - name: Récupérer le repository
+        uses: actions/checkout@v7
+
+
+      # ------------------------------------------------------
+      # 2. INITIALISER CODEQL
+      # ------------------------------------------------------
+      #
+      # CodeQL prépare son environnement d'analyse.
+      #
+      # La variable :
+      #
+      #   matrix.language
+      #
+      # vaut successivement :
+      #
+      #   java
+      #   python
+      #
+      # Le workflow est donc réutilisé pour les deux langages.
+      # ------------------------------------------------------
+
+      - name: Initialiser CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+
+      # ======================================================
+      # CONFIGURATION JAVA
+      # ======================================================
+      #
+      # Les étapes suivantes ne sont exécutées que lorsque
+      # CodeQL analyse Java.
+      #
+      # La condition :
+      #
+      #   matrix.language == 'java'
+      #
+      # empêche ces étapes de s'exécuter pour Python.
+      # ======================================================
+
+
+      # ------------------------------------------------------
+      # 3. INSTALLER JAVA 21
+      # ------------------------------------------------------
+
+      - name: Installer Java 21
+        if: matrix.language == 'java'
+        uses: actions/setup-java@v6
+        with:
+
+          # Distribution Java utilisée.
+          distribution: temurin
+
+          # Version Java utilisée par DIAM-YARAAM.
+          java-version: '21'
+
+          # Active la mise en cache des dépendances Maven
+          # afin d'accélérer les exécutions suivantes.
+          cache: maven
+
+
+      # ------------------------------------------------------
+      # 4. INSTALLER MAVEN 3.9.6
+      # ------------------------------------------------------
+      #
+      # Nous utilisons la même version de Maven que celle
+      # définie dans notre environnement actuel.
+      # ------------------------------------------------------
+
+      - name: Installer Maven 3.9.6
+        if: matrix.language == 'java'
+        shell: bash
+        run: |
+
+          # Télécharger Maven 3.9.6 depuis Apache Maven.
+          curl -fsSL \
+            https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.tar.gz \
+            -o "$RUNNER_TEMP/maven.tar.gz"
+
+
+          # Extraire l'archive Maven.
+          tar -xzf "$RUNNER_TEMP/maven.tar.gz" -C "$RUNNER_TEMP"
+
+
+          # Ajouter Maven au PATH du runner GitHub.
+          #
+          # Cela permet ensuite d'utiliser simplement :
+          #
+          #     mvn
+          #
+          # dans les étapes suivantes.
+          echo "$RUNNER_TEMP/apache-maven-3.9.6/bin" >> "$GITHUB_PATH"
+
+
+      # ------------------------------------------------------
+      # 5. COMPILER LE PROJET JAVA
+      # ------------------------------------------------------
+      #
+      # CodeQL doit observer la construction du projet Java
+      # afin de produire sa base d'analyse.
+      #
+      # Nous utilisons "compile" et non "verify" car le workflow
+      # backend-ci.yml s'occupe déjà du build complet et des tests.
+      # ------------------------------------------------------
+
+      - name: Construire le projet Java
+        if: matrix.language == 'java'
+        run: |
+          mvn --batch-mode --no-transfer-progress clean compile
+
+
+      # ======================================================
+      # 6. ANALYSER LE CODE
+      # ======================================================
+      #
+      # C'est ici que CodeQL effectue réellement son analyse
+      # de sécurité.
+      #
+      # Les résultats sont ensuite envoyés à GitHub Code
+      # Scanning.
+      # ======================================================
+
+      - name: Analyser avec CodeQL
+        uses: github/codeql-action/analyze@v4
+        with:
+
+          # Permet de distinguer les résultats Java et Python
+          # dans GitHub Code Scanning.
+          category: "/language:${{ matrix.language }}"

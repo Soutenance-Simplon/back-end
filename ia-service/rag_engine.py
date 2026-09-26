@@ -366,17 +366,47 @@ class RagEngine:
             {
                 "medicament1": "ASPIRINE",
                 "medicament2": "IBUPROFENE",
-                "aliases1": ["aspirine", "acide acétylsalicylique", "aspégic"],
-                "aliases2": ["ibuprofène", "ibuprofene", "advil", "kétoprofène", "diclofénac"],
-                "niveau_danger": "MAJEURE",
+                "aliases1": ["aspirine", "acide acétylsalicylique", "aspégic", "aspegic", "kardegic", "kardégic"],
+                "aliases2": ["ibuprofène", "ibuprofene", "advil", "nurofen", "kétoprofène", "ketoprofene", "diclofénac", "diclofenac", "profénid", "profenid", "voltarène", "voltarene"],
+                "niveau_danger": "CONTRE_INDICATION_ABSOLUE",
                 "bloquant": True,
                 "page_numero": 10,
                 "document_nom": "guideline-339-fr.pdf",
                 "document_url": "http://127.0.0.1:8089/documents/guideline-339-fr.pdf#page=10",
                 "source_medicale": "Guide Médicaments Essentiels MSF/OMS, Précautions AINS, p. 10",
-                "explication": "Cumul de toxicité digestive avec risque élevé d'ulcère perforé et annulation de l'effet cardioprotecteur antiagrégant.",
+                "explication": "ASSOCIATION DE DEUX AINS FORMELLEMENT CONTRE-INDIQUÉE. Cumul de toxicité digestive avec risque élevé d'ulcère perforé et d'hémorragie digestive sans bénéfice antalgique.",
                 "recommandation": "Ne jamais associer deux anti-inflammatoires non stéroïdiens simultanément.",
-                "alternative_recommandee": "Conserver l'Aspirine à dose antiagrégante et utiliser le Paracétamol pour la douleur."
+                "alternative_recommandee": "Conserver un seul AINS à dose efficace et utiliser le Paracétamol pour la douleur."
+            },
+            {
+                "medicament1": "PERINDOPRIL",
+                "medicament2": "SPIRONOLACTONE",
+                "aliases1": ["périndopril", "perindopril", "coversyl", "ramipril", "énalapril", "enalapril", "losartan"],
+                "aliases2": ["spironolactone", "aldactone", "éplérénone", "eplerenone"],
+                "niveau_danger": "MAJEURE",
+                "bloquant": False,
+                "page_numero": 77,
+                "document_nom": "guideline-339-fr.pdf",
+                "document_url": "http://127.0.0.1:8089/documents/guideline-339-fr.pdf#page=77",
+                "source_medicale": "Guide Médicaments Essentiels MSF/OMS, Diurétiques et IEC, p. 77",
+                "explication": "Risque d'hyperkaliémie sévère potentiellement mortelle (troubles de la conduction cardiaque).",
+                "recommandation": "Surveiller impérativement la kaliémie et la créatininémie à J7 puis régulièrement.",
+                "alternative_recommandee": "Ajuster la posologie ou associer un diurétique hypokaliémiant (Furosémide)."
+            },
+            {
+                "medicament1": "SIMVASTATINE",
+                "medicament2": "CLARITHROMYCINE",
+                "aliases1": ["simvastatine", "atorvastatine", "zocor", "tahor", "crestor"],
+                "aliases2": ["clarithromycine", "érythromycine", "erythromycine", "zeclar", "josacine"],
+                "niveau_danger": "MAJEURE",
+                "bloquant": False,
+                "page_numero": 83,
+                "document_nom": "guideline-339-fr.pdf",
+                "document_url": "http://127.0.0.1:8089/documents/guideline-339-fr.pdf#page=83",
+                "source_medicale": "Guide Médicaments Essentiels MSF/OMS, Hypolipémiants et Macrolides, p. 83",
+                "explication": "Inhibition du CYP3A4 avec risque de rhabdomyolyse aiguë et insuffisance rénale par surdosage en statine.",
+                "recommandation": "Interrompre temporairement la statine pendant la durée du traitement antibiotique.",
+                "alternative_recommandee": "Remplacer par Azithromycine (non inhibiteur CYP3A4) ou Amoxicilline."
             }
         ]
 
@@ -385,7 +415,7 @@ class RagEngine:
             {
                 "allergie": "PENICILLINE",
                 "aliases_allergie": ["pénicilline", "penicilline", "amoxicilline", "bêtalactamines", "beta lactamines"],
-                "medicaments_interdits": ["amoxicilline", "amoxicilline/acide clavulanique", "clamoxyl", "augmentin", "ampicilline"],
+                "medicaments_interdits": ["amoxicilline", "amoxicilline/acide clavulanique", "clamoxyl", "augmentin", "ampicilline", "oracilline"],
                 "niveau_danger": "CONTRE_INDICATION_ABSOLUE",
                 "bloquant": True,
                 "page_numero": 38,
@@ -399,7 +429,7 @@ class RagEngine:
             {
                 "allergie": "SULFAMIDES",
                 "aliases_allergie": ["sulfamide", "sulfamides", "cotrimoxazole", "bactrim"],
-                "medicaments_interdits": ["co-trimoxazole", "sulfaméthoxazole", "bactrim"],
+                "medicaments_interdits": ["co-trimoxazole", "sulfaméthoxazole", "bactrim", "cotrimoxazole"],
                 "niveau_danger": "CONTRE_INDICATION_ABSOLUE",
                 "bloquant": True,
                 "page_numero": 12,
@@ -409,6 +439,34 @@ class RagEngine:
                 "explication": "Risque de toxidermie sévère (Syndrome de Stevens-Johnson / Lyell).",
                 "recommandation": "Prescription strictement interdite chez le patient allergique aux sulfamides.",
                 "alternative_recommandee": "Amoxicilline ou Ciprofloxacine selon la localisation de l'infection."
+            },
+            {
+                "allergie": "AINS / ASPIRINE",
+                "aliases_allergie": ["ains", "aspirine", "aspirin", "ibuprofène", "ibuprofene", "anti-inflammatoire"],
+                "medicaments_interdits": ["ibuprofène", "ibuprofene", "advil", "nurofen", "kétoprofène", "ketoprofene", "diclofénac", "diclofenac", "aspirine", "aspégic", "naproxène", "voltarène"],
+                "niveau_danger": "CONTRE_INDICATION_ABSOLUE",
+                "bloquant": True,
+                "page_numero": 10,
+                "document_nom": "guideline-339-fr.pdf",
+                "document_url": "http://127.0.0.1:8089/documents/guideline-339-fr.pdf#page=10",
+                "source_medicale": "Guide Médicaments Essentiels MSF/OMS, Monographie AINS, p. 10",
+                "explication": "Risque de crise d'asthme sévère (syndrome de Widal), bronchospasme aigu ou choc anaphylactoïde.",
+                "recommandation": "Contre-indication absolue à tous les AINS.",
+                "alternative_recommandee": "Privilégier le Paracétamol 1g ou un antalgique de palier 2 (Tramadol)."
+            },
+            {
+                "allergie": "MACROLIDES",
+                "aliases_allergie": ["macrolide", "macrolides", "azithromycine", "érythromycine", "clarithromycine"],
+                "medicaments_interdits": ["azithromycine", "clarithromycine", "érythromycine", "josacine", "rovamycine", "zithromax"],
+                "niveau_danger": "CONTRE_INDICATION_ABSOLUE",
+                "bloquant": True,
+                "page_numero": 44,
+                "document_nom": "guideline-339-fr.pdf",
+                "document_url": "http://127.0.0.1:8089/documents/guideline-339-fr.pdf#page=44",
+                "source_medicale": "Guide Médicaments Essentiels MSF/OMS, Monographie Macrolides, p. 44",
+                "explication": "Réaction d'hypersensibilité cutanée et hépatique sévère.",
+                "recommandation": "Éviter la classe des macrolides.",
+                "alternative_recommandee": "Amoxicilline, Céfixime ou Doxycycline selon indication clinique."
             }
         ]
 

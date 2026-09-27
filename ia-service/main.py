@@ -408,32 +408,37 @@ def get_safe_document_path(filename: str) -> tuple[str, str]:
     # Résolution canonique absolue du répertoire documentaire
     doc_dir_real = os.path.realpath(DOCUMENTS_DIR)
 
-    # Construction puis résolution canonique du chemin demandé
-    candidate_path = os.path.join(doc_dir_real, clean_name)
-    resolved_path = os.path.realpath(candidate_path)
-
-    # Vérification stricte que le fichier reste dans DOCUMENTS_DIR
+    # Répertoire de confiance : inventaire des PDF réels présents sur le disque (OWASP Whitelist)
+    # Les chemins et noms certifiés proviennent exclusivement de la lecture du répertoire serveur.
+    trusted_documents: dict[str, tuple[str, str]] = {}
     try:
-        is_inside_documents = (
-            os.path.commonpath([doc_dir_real, resolved_path]) == doc_dir_real
-            and (
-                resolved_path.startswith(doc_dir_real + os.sep)
-                or resolved_path == doc_dir_real
-            )
+        with os.scandir(doc_dir_real) as entries:
+            for entry in entries:
+                if entry.is_file() and entry.name.lower().endswith(".pdf"):
+                    canonical_path = os.path.realpath(entry.path)
+                    # Confinement strict dans DOCUMENTS_DIR
+                    if canonical_path.startswith(doc_dir_real + os.sep):
+                        trusted_documents[entry.name] = (canonical_path, entry.name)
+    except OSError as err:
+        logger.error(f"Erreur d'accès au répertoire documentaire : {err}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur interne d'accès aux documents."
         )
-    except ValueError:
-        is_inside_documents = False
 
-    if not is_inside_documents:
+    # Validation par comparaison exacte dans la liste blanche
+    matched = trusted_documents.get(clean_name)
+    if not matched:
         logger.warning(
-            f"Tentative de sortie du répertoire documentaire détectée : {filename}"
+            f"Document demandé non trouvé dans la liste blanche autorisée : {filename}"
         )
         raise HTTPException(
-            status_code=403,
-            detail="Accès non autorisé."
+            status_code=404,
+            detail="Document introuvable."
         )
 
-    return resolved_path, clean_name
+    safe_path, canonical_name = matched
+    return safe_path, canonical_name
 
 @app.get("/documents/{filename}")
 @app.get("/ia/documents/{filename}")
@@ -443,9 +448,6 @@ async def get_document_pdf(filename: str):
     avec support du streaming, des octets et de l'ancrage direct par page (#page=X).
     """
     file_path, clean_name = get_safe_document_path(filename)
-    if not os.path.isfile(file_path):
-        logger.error(f"Fichier documentaire introuvable : {file_path}")
-        raise HTTPException(status_code=404, detail="Document introuvable.")
     
     return FileResponse(
         path=file_path,
@@ -464,9 +466,6 @@ async def view_document_page(filename: str, page: int = 1):
     Protégé contre le Path Traversal (CWE-22) et le Reflected XSS (CWE-79).
     """
     file_path, clean_name = get_safe_document_path(filename)
-    if not os.path.isfile(file_path):
-        logger.error(f"Fichier documentaire introuvable : {file_path}")
-        raise HTTPException(status_code=404, detail="Document introuvable.")
 
     safe_page = max(1, int(page))
     escaped_doc_name = html.escape(clean_name)

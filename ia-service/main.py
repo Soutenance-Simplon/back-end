@@ -364,17 +364,27 @@ def _get_safe_document_info(filename: str) -> tuple[str, str]:
     Valide et résout de manière sécurisée un fichier PDF dans DOCUMENTS_DIR.
     Protège contre les attaques de type Path Traversal (CWE-22).
     """
-    clean_name = os.path.basename(filename)
+    normalized_name = os.path.normpath(filename)
+    if (
+        normalized_name in (".", "")
+        or os.path.isabs(normalized_name)
+        or "/" in normalized_name
+        or "\\" in normalized_name
+    ):
+        logger.warning(f"Nom de fichier rejeté (chemin invalide) : {filename}")
+        raise HTTPException(status_code=400, detail="Nom de document invalide.")
+
+    clean_name = normalized_name
     if not SAFE_PDF_REGEX.match(clean_name):
         logger.warning(f"Nom de fichier rejeté (format invalide ou tentative de traversal) : {filename}")
         raise HTTPException(status_code=400, detail="Nom de document invalide.")
 
     # Résolution canonique absolue
-    resolved_path = os.path.realpath(os.path.join(DOCUMENTS_DIR, clean_name))
     doc_dir_real = os.path.realpath(DOCUMENTS_DIR)
+    resolved_path = os.path.realpath(os.path.join(doc_dir_real, clean_name))
 
     # Vérification stricte que le chemin résolu se trouve bien dans DOCUMENTS_DIR
-    if not resolved_path.startswith(doc_dir_real + os.sep) and resolved_path != doc_dir_real:
+    if os.path.commonpath([doc_dir_real, resolved_path]) != doc_dir_real:
         logger.warning(f"Tentative de sortie de répertoire détectée : {filename}")
         raise HTTPException(status_code=403, detail="Accès non autorisé.")
 

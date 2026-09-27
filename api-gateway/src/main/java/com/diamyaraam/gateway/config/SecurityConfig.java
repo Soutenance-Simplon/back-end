@@ -54,6 +54,7 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 // Autoriser les requêtes préliminaires CORS (preflight OPTIONS)
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
@@ -103,9 +104,9 @@ public class SecurityConfig {
      */
     @Bean
     public ReactiveJwtDecoder reactiveJwtDecoder() {
-        SecretKey key = new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        SecretKey key = new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA512");
         NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withSecretKey(key)
-                .macAlgorithm(MacAlgorithm.HS256)
+                .macAlgorithm(MacAlgorithm.HS512)
                 .build();
 
         OAuth2TokenValidator<Jwt> defaultValidator = JwtValidators.createDefault();

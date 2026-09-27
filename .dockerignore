@@ -1,0 +1,21 @@
+# Git & IDE
+.git
+.gitignore
+.idea
+.vscode
+*.iml
+
+# Maven build outputs
+**/target/
+target/
+
+# Python / IA service
+**/__pycache__/
+*.py[cod]
+*$py.class
+**/venv/
+.pytest_cache/
+
+# Docker & local secrets
+.env
+docker/postgres_data/

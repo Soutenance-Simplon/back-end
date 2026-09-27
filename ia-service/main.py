@@ -357,40 +357,76 @@ async def verifier_interactions(req: InteractionRequest):
 # ─── Consultation des Preuves Documentaires (PDF) ───────────────────────────
 
 DOCUMENTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "documents"))
-SAFE_PDF_REGEX = re.compile(r"^[a-zA-Z0-9_\-\.]+\.pdf$", re.IGNORECASE)
 
-def _get_safe_document_info(filename: str) -> tuple[str, str]:
+def get_safe_document_path(filename: str) -> tuple[str, str]:
     """
     Valide et résout de manière sécurisée un fichier PDF dans DOCUMENTS_DIR.
-    Protège contre les attaques de type Path Traversal (CWE-22).
+    Protège contre les attaques de type Path Traversal (CWE-22) :
+    - Refus des chemins absolus et des séparateurs de répertoires
+    - Validation stricte du format du nom de fichier via regex
+    - Résolution canonique absolue du chemin candidat
+    - Vérification d'inclusion stricte dans le répertoire documentaire
     """
     normalized_name = os.path.normpath(filename)
+
+    # Refuser tout chemin ou nom permettant une navigation dans l'arborescence
     if (
         normalized_name in (".", "")
         or os.path.isabs(normalized_name)
         or "/" in normalized_name
         or "\\" in normalized_name
     ):
-        logger.warning(f"Nom de fichier rejeté (chemin invalide) : {filename}")
-        raise HTTPException(status_code=400, detail="Nom de document invalide.")
+        logger.warning(
+            f"Nom de fichier rejeté (chemin invalide) : {filename}"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Nom de document invalide."
+        )
 
     clean_name = normalized_name
-    if not SAFE_PDF_REGEX.match(clean_name):
-        logger.warning(f"Nom de fichier rejeté (format invalide ou tentative de traversal) : {filename}")
-        raise HTTPException(status_code=400, detail="Nom de document invalide.")
 
-    # Résolution canonique absolue
+    # Autoriser uniquement les noms de fichiers PDF attendus
+    if not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9._-]*\.pdf",
+        clean_name,
+        re.IGNORECASE
+    ):
+        logger.warning(
+            f"Nom de fichier rejeté (format invalide ou tentative de traversal) : {filename}"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Nom de document invalide."
+        )
+
+    # Résolution canonique absolue du répertoire documentaire
     doc_dir_real = os.path.realpath(DOCUMENTS_DIR)
-    resolved_path = os.path.realpath(os.path.join(doc_dir_real, clean_name))
 
-    # Vérification stricte que le chemin résolu se trouve bien dans DOCUMENTS_DIR
-    if os.path.commonpath([doc_dir_real, resolved_path]) != doc_dir_real:
-        logger.warning(f"Tentative de sortie de répertoire détectée : {filename}")
-        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+    # Construction puis résolution canonique du chemin demandé
+    candidate_path = os.path.join(doc_dir_real, clean_name)
+    resolved_path = os.path.realpath(candidate_path)
 
-    if not os.path.isfile(resolved_path):
-        logger.error(f"Fichier documentaire introuvable : {resolved_path}")
-        raise HTTPException(status_code=404, detail="Document introuvable.")
+    # Vérification stricte que le fichier reste dans DOCUMENTS_DIR
+    try:
+        is_inside_documents = (
+            os.path.commonpath([doc_dir_real, resolved_path]) == doc_dir_real
+            and (
+                resolved_path.startswith(doc_dir_real + os.sep)
+                or resolved_path == doc_dir_real
+            )
+        )
+    except ValueError:
+        is_inside_documents = False
+
+    if not is_inside_documents:
+        logger.warning(
+            f"Tentative de sortie du répertoire documentaire détectée : {filename}"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Accès non autorisé."
+        )
 
     return resolved_path, clean_name
 
@@ -401,7 +437,10 @@ async def get_document_pdf(filename: str):
     Sert les documents cliniques PDF officiels (Guide MSF/OMS, Dorosz)
     avec support du streaming, des octets et de l'ancrage direct par page (#page=X).
     """
-    file_path, clean_name = _get_safe_document_info(filename)
+    file_path, clean_name = get_safe_document_path(filename)
+    if not os.path.isfile(file_path):
+        logger.error(f"Fichier documentaire introuvable : {file_path}")
+        raise HTTPException(status_code=404, detail="Document introuvable.")
     
     return FileResponse(
         path=file_path,
@@ -419,7 +458,11 @@ async def view_document_page(filename: str, page: int = 1):
     Visualiseur web certifié Diam Yaraam intégrant le PDF directement centré sur la page officielle.
     Protégé contre le Path Traversal (CWE-22) et le Reflected XSS (CWE-79).
     """
-    _, clean_name = _get_safe_document_info(filename)
+    file_path, clean_name = get_safe_document_path(filename)
+    if not os.path.isfile(file_path):
+        logger.error(f"Fichier documentaire introuvable : {file_path}")
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+
     safe_page = max(1, int(page))
     escaped_doc_name = html.escape(clean_name)
     encoded_url_doc = urllib.parse.quote(clean_name, safe="")

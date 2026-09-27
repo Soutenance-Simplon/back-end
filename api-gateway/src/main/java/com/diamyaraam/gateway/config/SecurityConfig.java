@@ -54,7 +54,6 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 // Autoriser les requêtes préliminaires CORS (preflight OPTIONS)
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()

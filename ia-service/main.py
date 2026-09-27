@@ -387,10 +387,15 @@ def get_safe_document_path(filename: str) -> tuple[str, str]:
     clean_name = normalized_name
 
     # Autoriser uniquement les noms de fichiers PDF attendus
-    if not re.fullmatch(
-        r"[A-Za-z0-9][A-Za-z0-9._-]*\.pdf",
-        clean_name,
-        re.IGNORECASE
+    if (
+        len(clean_name) > 255
+        or len(clean_name) <= 4
+        or not clean_name.lower().endswith(".pdf")
+        or not clean_name[0].isalnum()
+        or not all(
+            char.isalnum() or char in "._-"
+            for char in clean_name
+        )
     ):
         logger.warning(
             f"Nom de fichier rejeté (format invalide ou tentative de traversal) : {filename}"

@@ -412,7 +412,9 @@ async def view_document_page(filename: str, page: int = 1):
     _, clean_name = _get_safe_document_info(filename)
     safe_page = max(1, int(page))
     escaped_doc_name = html.escape(clean_name)
-    encoded_url_doc = urllib.parse.quote(clean_name)
+    encoded_url_doc = urllib.parse.quote(clean_name, safe="")
+    pdf_view_url = f"/documents/{encoded_url_doc}#page={safe_page}&zoom=100"
+    escaped_pdf_view_url = html.escape(pdf_view_url, quote=True)
 
     html_content = f"""
     <!DOCTYPE html>
@@ -441,10 +443,10 @@ async def view_document_page(filename: str, page: int = 1):
                 <span class="doc-name">{escaped_doc_name}</span>
             </div>
             <div>
-                <a class="btn" href="/documents/{encoded_url_doc}#page={safe_page}&zoom=100" target="_blank">Ouvrir dans le lecteur PDF (Page {safe_page}) ↗</a>
+                <a class="btn" href="{escaped_pdf_view_url}" target="_blank">Ouvrir dans le lecteur PDF (Page {safe_page}) ↗</a>
             </div>
         </div>
-        <iframe src="/documents/{encoded_url_doc}#page={safe_page}&zoom=100"></iframe>
+        <iframe src="{escaped_pdf_view_url}"></iframe>
     </body>
     </html>
     """

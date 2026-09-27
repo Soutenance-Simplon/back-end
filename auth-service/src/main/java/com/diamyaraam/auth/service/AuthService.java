@@ -89,7 +89,7 @@ public class AuthService {
         otpService.sendOtp(req.getTelephone(), OtpCode.OtpType.VERIFICATION_TELEPHONE);
         journal(AuditLog.ActionType.CREATION_COMPTE, user, null, "Inscription patient", true);
 
-        log.info("Compte patient créé : {} (statut EN_ATTENTE)", req.getTelephone());
+        log.info("Compte patient créé : {} (statut EN_ATTENTE)", maskTelephone(req.getTelephone()));
     }
 
     @Transactional
@@ -134,7 +134,7 @@ public class AuthService {
         String token = jwtService.generateToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
         journal(AuditLog.ActionType.CONNEXION_REUSSIE, user, ipAddress, "Login OK", true);
-        log.info("Login réussi : {}", user.getTelephone());
+        log.info("Login réussi : {}", maskTelephone(user.getTelephone()));
 
         AuthResponse response = new AuthResponse();
         response.setAccessToken(token);
@@ -246,5 +246,13 @@ public class AuthService {
         logItem.setDetails(details);
         logItem.setSuccess(false);
         auditLogRepository.save(logItem);
+    }
+
+    private String maskTelephone(String telephone) {
+        if (telephone == null || telephone.length() < 4) {
+            return "****";
+        }
+        int len = telephone.length();
+        return telephone.substring(0, Math.min(3, len - 4)) + "****" + telephone.substring(len - 4);
     }
 }

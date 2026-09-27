@@ -31,6 +31,12 @@ public class OtpService {
     @Value("${otp.max-attempts:5}")
     private int maxAttempts;
 
+    @Value("${otp.bypass.enabled:false}")
+    private boolean otpBypassEnabled;
+
+    @Value("${otp.bypass.code:456321}")
+    private String otpBypassCode;
+
     public OtpService(
             OtpCodeRepository otpCodeRepository,
             UserRepository userRepository,
@@ -57,7 +63,7 @@ public class OtpService {
         otp.setUsed(false);
         otpCodeRepository.save(otp);
 
-        log.info("[OTP GENERÉ] Code OTP pour {} : {} (valide {} min)", telephone, code, validityMinutes);
+        log.info("[OTP ENVOYÉ] Code OTP expédié pour {} (valide {} min)", maskTelephone(telephone), validityMinutes);
 
         // Envoi automatique via l'API officielle Meta WhatsApp Cloud
         whatsAppCloudApiService.sendOtpMessage(telephone, code, validityMinutes);
@@ -76,25 +82,24 @@ public class OtpService {
 
     @Transactional
     public boolean verifyOtp(String telephone, String codeSaisi, OtpCode.OtpType type) {
-        // --- BYPASS DE TEST POUR LA SOUTENANCE ---
-        if ("456321".equals(codeSaisi)) {
+        // Bypass de test pour environnement contrôlé (désactivable en production)
+        if (otpBypassEnabled && otpBypassCode != null && !otpBypassCode.isBlank() && otpBypassCode.equals(codeSaisi)) {
             if (OtpCode.OtpType.VERIFICATION_TELEPHONE.equals(type)) {
                 userRepository.findByTelephone(telephone).ifPresent(user -> {
                     user.setPhoneVerified(true);
                     user.setAccountStatus(com.diamyaraam.auth.entity.User.AccountStatus.ACTIF);
                     userRepository.save(user);
-                    log.info("Compte activé (BYPASS 456321) pour : {}", telephone);
+                    log.info("Compte activé (BYPASS configuré) pour : {}", maskTelephone(telephone));
                 });
             }
             return true;
         }
-        // -----------------------------------------
 
         Optional<OtpCode> optOtp = otpCodeRepository
                 .findTopByTelephoneAndOtpTypeAndUsedFalseOrderByCreatedAtDesc(telephone, type);
 
         if (optOtp.isEmpty()) {
-            log.warn("Aucun OTP actif pour {}", telephone);
+            log.warn("Aucun OTP actif pour {}", maskTelephone(telephone));
             return false;
         }
 
@@ -129,7 +134,7 @@ public class OtpService {
                 user.setAccountStatus(com.diamyaraam.auth.entity.User.AccountStatus.ACTIF);
                 userRepository.save(user);
                 journal(telephone, AuditLog.ActionType.ACTIVATION_COMPTE, "Compte activé");
-                log.info("Compte activé pour : {}", telephone);
+                log.info("Compte activé pour : {}", maskTelephone(telephone));
             });
         }
 
@@ -138,7 +143,20 @@ public class OtpService {
     }
 
     private String generateSecureCode() {
-        return "456321";
+        if (otpBypassEnabled && otpBypassCode != null && !otpBypassCode.isBlank()) {
+            return otpBypassCode;
+        }
+        SecureRandom random = new SecureRandom();
+        int num = 100000 + random.nextInt(900000);
+        return String.valueOf(num);
+    }
+
+    private String maskTelephone(String telephone) {
+        if (telephone == null || telephone.length() < 4) {
+            return "****";
+        }
+        int len = telephone.length();
+        return telephone.substring(0, Math.min(3, len - 4)) + "****" + telephone.substring(len - 4);
     }
 
     private void journal(String telephone, AuditLog.ActionType action, String details) {

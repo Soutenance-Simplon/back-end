@@ -8,6 +8,9 @@ import os
 import uuid
 import json
 import base64
+import html
+import re
+import urllib.parse
 import logging
 from datetime import datetime
 from typing import List, Dict, Optional, Any
@@ -40,13 +43,19 @@ app = FastAPI(
     version="2.1.0"
 )
 
-# Configuration CORS pour autoriser l'accès depuis le Gateway et le frontend
+# Configuration CORS sécurisée avec origines explicites et sans wildcard permissif
+cors_origins_env = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:8088,http://localhost:3000,http://localhost:8090"
+)
+allowed_origins_list = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins_list,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
 # ─── Modèles de requêtes et de réponses ─────────────────────────────────────
@@ -348,6 +357,32 @@ async def verifier_interactions(req: InteractionRequest):
 # ─── Consultation des Preuves Documentaires (PDF) ───────────────────────────
 
 DOCUMENTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "documents"))
+SAFE_PDF_REGEX = re.compile(r"^[a-zA-Z0-9_\-\.]+\.pdf$", re.IGNORECASE)
+
+def _get_safe_document_info(filename: str) -> tuple[str, str]:
+    """
+    Valide et résout de manière sécurisée un fichier PDF dans DOCUMENTS_DIR.
+    Protège contre les attaques de type Path Traversal (CWE-22).
+    """
+    clean_name = os.path.basename(filename)
+    if not SAFE_PDF_REGEX.match(clean_name):
+        logger.warning(f"Nom de fichier rejeté (format invalide ou tentative de traversal) : {filename}")
+        raise HTTPException(status_code=400, detail="Nom de document invalide.")
+
+    # Résolution canonique absolue
+    resolved_path = os.path.realpath(os.path.join(DOCUMENTS_DIR, clean_name))
+    doc_dir_real = os.path.realpath(DOCUMENTS_DIR)
+
+    # Vérification stricte que le chemin résolu se trouve bien dans DOCUMENTS_DIR
+    if not resolved_path.startswith(doc_dir_real + os.sep) and resolved_path != doc_dir_real:
+        logger.warning(f"Tentative de sortie de répertoire détectée : {filename}")
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    if not os.path.isfile(resolved_path):
+        logger.error(f"Fichier documentaire introuvable : {resolved_path}")
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+
+    return resolved_path, clean_name
 
 @app.get("/documents/{filename}")
 @app.get("/ia/documents/{filename}")
@@ -356,16 +391,13 @@ async def get_document_pdf(filename: str):
     Sert les documents cliniques PDF officiels (Guide MSF/OMS, Dorosz)
     avec support du streaming, des octets et de l'ancrage direct par page (#page=X).
     """
-    file_path = os.path.join(DOCUMENTS_DIR, filename)
-    if not os.path.isfile(file_path):
-        logger.error(f"Fichier documentaire introuvable : {file_path}")
-        raise HTTPException(status_code=404, detail=f"Document introuvable : {filename}")
+    file_path, clean_name = _get_safe_document_info(filename)
     
     return FileResponse(
         path=file_path,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"inline; filename=\"{filename}\"",
+            "Content-Disposition": f'inline; filename="{clean_name}"',
             "Accept-Ranges": "bytes"
         }
     )
@@ -375,18 +407,20 @@ async def get_document_pdf(filename: str):
 async def view_document_page(filename: str, page: int = 1):
     """
     Visualiseur web certifié Diam Yaraam intégrant le PDF directement centré sur la page officielle.
+    Protégé contre le Path Traversal (CWE-22) et le Reflected XSS (CWE-79).
     """
-    file_path = os.path.join(DOCUMENTS_DIR, filename)
-    if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="Document introuvable")
-    
+    _, clean_name = _get_safe_document_info(filename)
+    safe_page = max(1, int(page))
+    escaped_doc_name = html.escape(clean_name)
+    encoded_url_doc = urllib.parse.quote(clean_name)
+
     html_content = f"""
     <!DOCTYPE html>
     <html lang="fr">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Diam Yaraam — Source Médicale Officielle (Page {page})</title>
+        <title>Diam Yaraam — Source Médicale Officielle (Page {safe_page})</title>
         <style>
             * {{ box-sizing: border-box; }}
             body, html {{ margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0F172A; }}
@@ -403,18 +437,21 @@ async def view_document_page(filename: str, page: int = 1):
         <div class="header">
             <div class="title">
                 <span>📖 Diam Yaraam — Référentiel Médical Officiel</span>
-                <span class="badge-page">Page {page}</span>
-                <span class="doc-name">{filename}</span>
+                <span class="badge-page">Page {safe_page}</span>
+                <span class="doc-name">{escaped_doc_name}</span>
             </div>
             <div>
-                <a class="btn" href="/documents/{filename}#page={page}&zoom=100" target="_blank">Ouvrir dans le lecteur PDF (Page {page}) ↗</a>
+                <a class="btn" href="/documents/{encoded_url_doc}#page={safe_page}&zoom=100" target="_blank">Ouvrir dans le lecteur PDF (Page {safe_page}) ↗</a>
             </div>
         </div>
-        <iframe src="/documents/{filename}#page={page}&zoom=100"></iframe>
+        <iframe src="/documents/{encoded_url_doc}#page={safe_page}&zoom=100"></iframe>
     </body>
     </html>
     """
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(
+        content=html_content,
+        headers={"Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self';"}
+    )
 
 if __name__ == "__main__":
     import uvicorn

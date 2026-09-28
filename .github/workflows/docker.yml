@@ -1,0 +1,105 @@
+# ============================================================
+# DIAM-YARAAM — Pipeline CD / Build & Publication Docker (GHCR)
+# Construit les images Docker pour chaque microservice et les
+# publie sur GitHub Container Registry (ghcr.io).
+# ============================================================
+
+name: DIAM-YARAAM Docker CD (GHCR)
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    name: Build & Push ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: discovery-server
+            dockerfile: discovery-server/Dockerfile
+            context: .
+          - service: api-gateway
+            dockerfile: api-gateway/Dockerfile
+            context: .
+          - service: auth-service
+            dockerfile: auth-service/Dockerfile
+            context: .
+          - service: patient-service
+            dockerfile: patient-service/Dockerfile
+            context: .
+          - service: medecin-service
+            dockerfile: medecin-service/Dockerfile
+            context: .
+          - service: rdv-service
+            dockerfile: rdv-service/Dockerfile
+            context: .
+          - service: dossier-service
+            dockerfile: dossier-service/Dockerfile
+            context: .
+          - service: notification-service
+            dockerfile: notification-service/Dockerfile
+            context: .
+          - service: wallet-service
+            dockerfile: wallet-service/Dockerfile
+            context: .
+          - service: ia-service
+            dockerfile: ia-service/Dockerfile
+            context: ./ia-service
+
+    steps:
+      - name: Récupérer le repository
+        uses: actions/checkout@v4
+
+      - name: Configurer Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Connexion à GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Déterminer le nom de l'image (minuscules)
+        id: image_info
+        run: |
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_PATH="${{ env.REGISTRY }}/${OWNER_LOWER}/diam-yaraam-${{ matrix.service }}"
+          echo "image_path=${IMAGE_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Extraire les métadonnées Docker (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image_info.outputs.image_path }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=short
+
+      - name: Construire et publier l'image Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

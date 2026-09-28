@@ -356,7 +356,7 @@ async def verifier_interactions(req: InteractionRequest):
 
 # ─── Consultation des Preuves Documentaires (PDF) ───────────────────────────
 
-DOCUMENTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "documents"))
+DOCUMENTS_DIR = os.path.abspath(os.getenv("DOCUMENTS_PATH", os.path.join(os.path.dirname(__file__), "..", "documents")))
 
 def get_safe_document_path(filename: str) -> tuple[str, str]:
     """

@@ -18,10 +18,14 @@ public class RealtimePublisher {
     private static final Logger log = LoggerFactory.getLogger(RealtimePublisher.class);
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private static final String BROADCAST_URL = "http://localhost:8084/ws-broadcast";
+    private final String broadcastUrl;
 
-    public RealtimePublisher(ObjectMapper objectMapper) {
+    public RealtimePublisher(
+            ObjectMapper objectMapper,
+            @org.springframework.beans.factory.annotation.Value("${ws.broadcast.url:http://localhost:8084/ws-broadcast}") String broadcastUrl
+    ) {
         this.objectMapper = objectMapper;
+        this.broadcastUrl = broadcastUrl;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(2))
                 .build();
@@ -36,7 +40,7 @@ public class RealtimePublisher {
             );
             String json = objectMapper.writeValueAsString(body);
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(BROADCAST_URL))
+                    .uri(URI.create(this.broadcastUrl))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(json))
                     .timeout(Duration.ofSeconds(2))

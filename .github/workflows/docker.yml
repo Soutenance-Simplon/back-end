@@ -84,7 +84,7 @@ jobs:
 
       - name: Extraire les métadonnées Docker (tags, labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image_info.outputs.image_path }}
           tags: |

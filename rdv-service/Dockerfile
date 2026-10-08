@@ -4,6 +4,9 @@
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 WORKDIR /build
 
+# Configuration du mirror Maven pour éviter le rate-limiting HTTP 429 de Maven Central en CI/CD
+COPY .mvn/settings.xml /root/.m2/settings.xml
+
 # 1. Copie et installation du POM parent (mode non-récursif)
 COPY pom.xml .
 RUN mvn --batch-mode clean install -N -DskipTests

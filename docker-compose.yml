@@ -4,6 +4,8 @@
 # Microservices Spring Boot, Service IA FastAPI, API Gateway)
 # ============================================================
 
+name: diam-yaraam
+
 services:
 
   # ----------------------------------------------------------
@@ -354,6 +356,54 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - diam-network
+
+  # ----------------------------------------------------------
+  # 12. ADMIN DASHBOARD (Portail Administrateur Vue 3 / Vite)
+  # ----------------------------------------------------------
+  admin-dashboard:
+    build:
+      context: ../admin-dashboard
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8090/api
+    container_name: diam-admin-dashboard
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - diam-network
+
+  # ----------------------------------------------------------
+  # 13. FRONTEND WEB (Application Patient & Médecin Flutter Web)
+  # ----------------------------------------------------------
+  frontend-web:
+    build:
+      context: ../frontendl3-master
+      dockerfile: ${FLUTTER_DOCKERFILE:-Dockerfile.prebuilt}
+    container_name: diam-frontend-web
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - diam-network
 

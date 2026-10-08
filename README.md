@@ -19,18 +19,28 @@ Architecture microservices distribuée pour la plateforme de santé et de télé
 | **Notification Service** | `8086` | Spring Boot 3, JavaMail, Firebase FCM | Notifications push mobiles, courriels de confirmation et rappels |
 | **Wallet Service** | `8087` | Spring Boot 3, Spring Data JPA | Portefeuille santé en FCFA, recharges Wave / OM, paiements |
 | **IA Service** | `8089` | FastAPI, Python 3, OpenRouter, RAG | Triage clinique, vérification pharmacologique Dorosz |
+| **Admin Dashboard** | `5173` | Vue 3, Vite, TypeScript, Nginx | Portail d'administration complet, gestion utilisateurs, finances |
+| **Frontend Web** | `8088` | Flutter Web, Dart, Nginx | Application patient & praticien, téléconsultation, Pass Vital |
 
 ---
 
 ## 🐳 Conteneurisation & Déploiement Docker (Recommandé)
 
-L'ensemble de l'architecture backend, de la base de données PostgreSQL, d'Eureka, de l'IA et de l'API Gateway est entièrement orchestré via **Docker Compose** avec des *multi-stage builds* sécurisés et optimisés.
+L'ensemble de l'architecture backend, de la base de données PostgreSQL, d'Eureka, de l'IA, de l'API Gateway et des deux interfaces frontend (Vue.js et Flutter) est entièrement orchestré via **Docker Compose** avec des *multi-stage builds* sécurisés et optimisés.
 
 ### Schéma d'Architecture Docker
 
 ```mermaid
 graph TD
-    Client[Navigateurs & Applications Mobiles] --> Gateway[api-gateway :8090]
+    User[Navigateurs Web & Mobiles]
+    
+    subgraph Frontends Conteneurisés Nginx
+        AdminUI[admin-dashboard :5173<br/>Vue 3 + Vite + Nginx]
+        WebUI[frontend-web :8088<br/>Flutter Web + Nginx]
+    end
+
+    User --> AdminUI & WebUI
+    AdminUI & WebUI --> Gateway[api-gateway :8090]
     
     subgraph Service Discovery
         Eureka[discovery-server :8761]
